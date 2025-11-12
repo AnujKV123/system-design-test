@@ -141,6 +141,19 @@ if (response.status === 'success') {
 }
 ```
 
+#### Query Parameters with Automatic URL Encoding
+
+```typescript
+// Query parameters are automatically URL-encoded
+const response = await client.get('/api/products', {
+  category: 'electronics',
+  limit: 10,
+  search: 'hello world',  // Spaces encoded as %20
+  filter: 'price>100'     // Special chars encoded
+});
+// Results in: /api/products?category=electronics&limit=10&search=hello%20world&filter=price%3E100
+```
+
 #### With Authentication
 
 ```typescript
@@ -496,6 +509,8 @@ const state: ImmutableAppState = {
 
 **Fetch API**: Uses native fetch for broad compatibility and modern async/await patterns, avoiding additional HTTP client dependencies.
 
+**Automatic URL Encoding**: Query parameters are automatically encoded using `encodeURIComponent`, safely handling special characters like spaces, ampersands, and equals signs in parameter values.
+
 ### Data Transformation Pipeline
 
 **Immutable Transformations**: Each transformation step returns new data rather than mutating input, preventing side effects and making the pipeline predictable.
@@ -589,6 +604,3 @@ The assessment intentionally avoids external libraries to demonstrate:
 
 In a production environment, libraries like `axios` (HTTP client), `zod` (validation), or `rxjs` (reactive programming) might be appropriate depending on specific requirements.
 
-## License
-
-MIT
