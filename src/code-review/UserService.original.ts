@@ -1,53 +1,35 @@
 // Original UserService with multiple issues for code review
+// This is the exact code provided in the assessment
 
 export class UserService {
   private users: any[] = [];
 
+  async getUser(id: string) {
+    const response = await fetch(`/api/users/${id}`);
+    const data = await response.json();
+    return data;
+  }
+
   async createUser(userData: any) {
     const user = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(),
       ...userData,
       createdAt: new Date()
     };
-    
     this.users.push(user);
     return user;
   }
 
-  async getUserById(id: string) {
-    const user = this.users.find(u => u.id === id);
-    return user || null;
-  }
-
   async updateUser(id: string, updates: any) {
     const user = this.users.find(u => u.id === id);
-    
-    if (!user) {
-      return null;
+    if (user) {
+      Object.assign(user, updates);
+      return user;
     }
-    
-    Object.assign(user, updates);
-    return user;
+    return null;
   }
 
-  async deleteUser(id: string) {
-    const index = this.users.findIndex(u => u.id === id);
-    
-    if (index === -1) {
-      return null;
-    }
-    
-    this.users.splice(index, 1);
-    return true;
-  }
-
-  async getAllUsers() {
+  getAllUsers() {
     return this.users;
-  }
-
-  async fetchUserFromApi(userId: string) {
-    const response = await fetch(`https://api.example.com/users/${userId}`);
-    const data = await response.json();
-    return data;
   }
 }

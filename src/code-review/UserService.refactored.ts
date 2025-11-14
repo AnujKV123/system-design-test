@@ -22,8 +22,7 @@ export interface UserRepository {
   create(user: User): Promise<User>;
   findById(id: string): Promise<User | null>;
   update(id: string, updates: Partial<User>): Promise<User | null>;
-  delete(id: string): Promise<boolean>;
-  findAll(): Promise<User[]>;
+  findAllSync(): User[];
 }
 
 export class ValidationError extends Error {
@@ -74,6 +73,46 @@ export class DatabaseError extends Error {
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
 
+  async getUser(id: string): Promise<User> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const response = await fetch(`/api/users/${id}`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new HttpError(
+          response.status,
+          `Failed to fetch user: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      return data as User;
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new TimeoutError('Request timed out after 5000ms');
+      }
+
+      if (error instanceof HttpError) {
+        throw error;
+      }
+
+      throw new NetworkError(
+        `Network request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
   async createUser(userData: CreateUserDto): Promise<User> {
     try {
       this.validateUserData(userData);
@@ -92,25 +131,6 @@ export class UserService {
       }
       throw new DatabaseError(
         `Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  async getUserById(id: string): Promise<User> {
-    try {
-      const user = await this.userRepository.findById(id);
-
-      if (!user) {
-        throw new NotFoundError(`User with id ${id} not found`);
-      }
-
-      return user;
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      throw new DatabaseError(
-        `Failed to fetch user: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
@@ -156,71 +176,13 @@ export class UserService {
     }
   }
 
-  async deleteUser(id: string): Promise<boolean> {
+  getAllUsers(): User[] {
     try {
-      const user = await this.userRepository.findById(id);
-
-      if (!user) {
-        throw new NotFoundError(`User with id ${id} not found`);
-      }
-
-      return await this.userRepository.delete(id);
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      throw new DatabaseError(
-        `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  async getAllUsers(): Promise<User[]> {
-    try {
-      return await this.userRepository.findAll();
+      const users = this.userRepository.findAllSync();
+      return users;
     } catch (error) {
       throw new DatabaseError(
         `Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  async fetchUserFromApi(userId: string, timeoutMs = 5000): Promise<User> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(`https://api.example.com/users/${userId}`, {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new HttpError(
-          response.status,
-          `Failed to fetch user: ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      return data as User;
-    } catch (error) {
-      clearTimeout(timeoutId);
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new TimeoutError(`Request timed out after ${timeoutMs}ms`);
-      }
-
-      if (error instanceof HttpError) {
-        throw error;
-      }
-
-      throw new NetworkError(
-        `Network request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }
@@ -307,11 +269,7 @@ export class InMemoryUserRepository implements UserRepository {
     return { ...updatedUser };
   }
 
-  async delete(id: string): Promise<boolean> {
-    return this.users.delete(id);
-  }
-
-  async findAll(): Promise<User[]> {
+  findAllSync(): User[] {
     return Array.from(this.users.values()).map(user => ({ ...user }));
   }
 }
